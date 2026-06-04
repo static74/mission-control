@@ -10,6 +10,38 @@ This repo (git root `/Users/sb/claude/stream-deck/`) holds **Mission Control**, 
 
 ## Session Log
 
+### 2026-06-04 (session 2) - Action wired into the plugin + Property Inspector (Task 5.3 + Phase 6)
+
+**Status:** The Meeting Countdown action is now REGISTERED in the plugin entry and the plugin RESTARTS clean on the device. The Property Inspector exists, is themed, and is vendored locally (no CDN). Branch `meeting-countdown`: 46 tests passing, `tsc --noEmit` clean, working tree clean. Two new commits: `759e57a` (Task 5.3), `d971477` (Phase 6). It has NOT been verified rendering on the physical key yet; that is Phase 7, which needs Shane on the device with a fresh secret iCal URL.
+
+**What we accomplished:**
+- **Task 5.3:** Registered `MeetingCountdownAction` in `src/plugin.ts`; swapped the manifest `Actions` entry from the scaffold Counter to Meeting Countdown (`Controllers: ["Keypad"]`, `PropertyInspectorPath: "ui/meeting-countdown.html"`, `imgs/actions/meeting/...`); deleted the scaffold sample (`increment-counter.ts`, its PI, its icons); added placeholder meeting icons by copying the counter PNGs (dimensions already manifest-valid). Built and restarted on the device clean.
+- **Security fix (not in the plan, grounded in SDK source):** dropped the scaffold's `streamDeck.logger.setLevel("trace")`. The SDK logs raw WebSocket frames (which carry the settings payload, i.e. the secret iCal URL) only at `trace` (`connection.js:74,137`); the default level is `info`, so removing that line keeps the credential off the on-disk plugin log.
+- **Phase 6:** Vendored `sdpi-components` **v4.0.1** locally into `ui/lib/` (sha256 recorded in `sdpi-components.js.sha256`), wrote `ui/meeting-countdown.html` with the six settings controls, themed to the mission-console palette (the header echoes the key face's own readout and hazard-chevron motifs). Verified by inspection that the bundle issues no runtime network requests and the panel loads no remote scripts or fonts (air-gap requirement satisfied).
+
+**Grounded deviations from the plan (verified against the vendored library, not guessed):**
+- The masked URL field uses the dedicated `<sdpi-password>` element. A bare `password` attribute on `<sdpi-textfield>` is NOT honored in v4.0.1 (the bundle registers `sdpi-password` as a textfield subclass that forces `type="password"`), so the plan's markup would have left the credential field visible.
+- The credential note is plain themed HTML; `<sdpi-item-value>` (used in the plan) is not a registered element in v4.0.1.
+
+**Files created/changed this session:**
+- `mission-control/src/plugin.ts` - registers MeetingCountdownAction; no trace logging.
+- `mission-control/com.static74.mission-control.sdPlugin/manifest.json` - Meeting Countdown action entry.
+- `mission-control/.../imgs/actions/meeting/{icon,icon@2x,key,key@2x}.png` - PLACEHOLDER icons (copied from counter; replace with themed art later).
+- `mission-control/.../ui/meeting-countdown.html` - Property Inspector.
+- `mission-control/.../ui/lib/sdpi-components.js` (+ `.sha256`) - locally vendored v4.0.1.
+- Deleted: `src/actions/increment-counter.ts`, `ui/increment-counter.html`, `imgs/actions/counter/`.
+
+**What I verified here vs. what only Shane can verify on the device:**
+- Verified here: `npm run build` succeeds and regenerates `bin/plugin.js`, `tsc --noEmit` clean, 46 tests pass, manifest is valid JSON with a PI path that resolves, the PI loads only the local script (no remote refs), the sdpi bundle makes no network calls, and the plugin restarts clean.
+- NOT verified here (needs the physical Stream Deck + Shane's real feed): the key actually rendering each state, and the PI rendering/masking visually on the device.
+
+**Next steps (resume HERE, in order):**
+- [ ] **Phase 7 (ON DEVICE, needs Shane + a FRESH secret iCal URL):** drop "Meeting Countdown" on a key; with no URL it should show `SET URL`, then `SYNC` briefly on first load, then the countdown after a poll. Walk each state: cruise (`T- 20m`, calm ice), terminal (pulsing amber<->red `MM:SS` ticking each second), liftoff (red `NOW`), and the fault behavior (toggle Wi-Fi to confirm it holds the last value as stale then recovers; a bad URL shows `NO LINK`). Confirm the PI renders themed with the URL field masked and no network access, and that switching the Stream Deck to another page and back stops then resumes the redraw timer (no runaway CPU). The plan's Phase 7 has the exact step list.
+- [ ] **Polish (non-blocking):** replace the placeholder meeting icons with space-themed art; optionally `streamdeck pack com.static74.mission-control.sdPlugin` for distribution.
+- [ ] **Later milestone:** the Slack Comms action (its own adapter reading the Slack Dock badge; `AXStatusLabel` on macOS 26 is UNPROVEN, treat as a fresh feasibility check). Fully independent of the calendar action.
+
+---
+
 ### 2026-06-04 - Brainstorm to verified pure-Node core (with EventKit to iCal pivot)
 
 **Status:** Pure-Node core is COMPLETE and independently review-APPROVED. It is NOT yet wired into the plugin entry, has no Property Inspector, and has not run on the device. Branch `meeting-countdown`: 46 tests passing, `tsc --noEmit` clean, working tree clean.
@@ -47,8 +79,8 @@ This repo (git root `/Users/sb/claude/stream-deck/`) holds **Mission Control**, 
 - `mission-control/test/fixtures/sample.ics` - synthetic fixture (never real data).
 
 **Next steps (resume HERE, in order):**
-- [ ] **Task 5.3 (mechanical, no device needed):** register `MeetingCountdownAction` in `mission-control/src/plugin.ts`; add its `Actions` entry to the manifest (`Controllers: ["Keypad"]`, `PropertyInspectorPath: "ui/meeting-countdown.html"`, icon paths); delete the scaffold sample `src/actions/increment-counter.ts`. Then `npm run build` and `streamdeck restart com.static74.mission-control`.
-- [ ] **Phase 6 (Property Inspector):** create `com.static74.mission-control.sdPlugin/ui/meeting-countdown.html` with the iCal URL field (use `password`), threshold, and filter toggles. Vendor `sdpi-components.js` LOCALLY into `ui/lib/` (NO CDN, air-gap + supply-chain). Style with the frontend-design skill.
+- [x] **Task 5.3 (mechanical, no device needed) — DONE in session 2:** register `MeetingCountdownAction` in `mission-control/src/plugin.ts`; add its `Actions` entry to the manifest (`Controllers: ["Keypad"]`, `PropertyInspectorPath: "ui/meeting-countdown.html"`, icon paths); delete the scaffold sample `src/actions/increment-counter.ts`. Then `npm run build` and `streamdeck restart com.static74.mission-control`.
+- [x] **Phase 6 (Property Inspector) — DONE in session 2:** create `com.static74.mission-control.sdPlugin/ui/meeting-countdown.html` with the iCal URL field (use `password`), threshold, and filter toggles. Vendor `sdpi-components.js` LOCALLY into `ui/lib/` (NO CDN, air-gap + supply-chain). Style with the frontend-design skill.
 - [ ] **Phase 7 (on device, with Shane):** drop the action on a key, paste Shane's FRESH secret iCal URL, verify idle/cruise/terminal/liftoff, the `NO LINK`/`SET URL`/`SYNC` fault frames, and the `willAppear`/`willDisappear` redraw-timer lifecycle (no runaway CPU on a hidden page).
 - [ ] **Later milestone:** the Slack Comms action (its own adapter reading the Slack Dock badge via Accessibility). Note: reading the badge via `AXStatusLabel` on macOS 26 is UNPROVEN; treat as a fresh feasibility check (see spec). Fully independent of the calendar action.
 
