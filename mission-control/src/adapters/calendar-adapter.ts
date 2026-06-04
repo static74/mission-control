@@ -20,6 +20,7 @@ export class CalendarAdapter implements SourceAdapter<CalEvent[]> {
   private snapshot: Snapshot<CalEvent[]> = { status: "unavailable", value: null, fetchedAt: 0, stale: false };
   private listeners: Array<(s: Snapshot<CalEvent[]>) => void> = [];
   private timer: ReturnType<typeof setInterval> | null = null;
+  private consecutiveFailures = 0;
 
   private readonly fetchText: (url: string) => Promise<string>;
   private readonly now: () => number;
@@ -61,14 +62,23 @@ export class CalendarAdapter implements SourceAdapter<CalEvent[]> {
     try {
       const text = await this.fetchText(this.url);
       const events = parseIcs(text, now, this.windowMs, this.ownerEmail);
+      this.consecutiveFailures = 0;
       this.set({ status: "ok", value: events, fetchedAt: now, stale: false });
     } catch {
-      this.set({
-        status: "unavailable",
-        value: this.snapshot.value,
-        fetchedAt: now,
-        stale: this.snapshot.value !== null,
-      });
+      this.consecutiveFailures++;
+      if (this.consecutiveFailures >= 3) {
+        // Spec §10: after 3+ consecutive failures, enter fault state — value null
+        // so the action's `unavailable && value === null` branch shows NO LINK.
+        this.set({ status: "unavailable", value: null, fetchedAt: now, stale: false });
+      } else {
+        // Still within grace period — return cached value flagged stale.
+        this.set({
+          status: "unavailable",
+          value: this.snapshot.value,
+          fetchedAt: now,
+          stale: this.snapshot.value !== null,
+        });
+      }
     }
   }
 

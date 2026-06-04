@@ -57,3 +57,54 @@ test("onChange fires after a poll", async () => {
   await a.pollOnce();
   expect(cb).toHaveBeenCalledOnce();
 });
+
+// I1: consecutive-failure escalation tests
+test("two consecutive failures after a good read still return cached stale value", async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(ICS_ONE)
+    .mockRejectedValue(new Error("network"));
+  const a = adapter(fetcher);
+  await a.pollOnce(); // success
+  await a.pollOnce(); // failure #1
+  await a.pollOnce(); // failure #2
+  const s = a.latest();
+  expect(s.status).toBe("unavailable");
+  expect(s.stale).toBe(true);
+  expect(s.value?.[0].title).toBe("Standup"); // cached value still present
+});
+
+test("three consecutive failures return value:null (fault state)", async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(ICS_ONE)
+    .mockRejectedValue(new Error("network"));
+  const a = adapter(fetcher);
+  await a.pollOnce(); // success
+  await a.pollOnce(); // failure #1
+  await a.pollOnce(); // failure #2
+  await a.pollOnce(); // failure #3 — escalate
+  const s = a.latest();
+  expect(s.status).toBe("unavailable");
+  expect(s.value).toBeNull();
+  expect(s.stale).toBe(false);
+});
+
+test("success after failures resets counter so the next single failure returns cached (not null)", async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(ICS_ONE)   // success
+    .mockRejectedValueOnce(new Error("network")) // failure #1
+    .mockRejectedValueOnce(new Error("network")) // failure #2
+    .mockRejectedValueOnce(new Error("network")) // failure #3 — would escalate
+    .mockResolvedValueOnce(ICS_ONE)              // success — resets counter
+    .mockRejectedValueOnce(new Error("network")); // failure #1 again — should still be cached
+  const a = adapter(fetcher);
+  await a.pollOnce(); // success
+  await a.pollOnce(); // failure #1
+  await a.pollOnce(); // failure #2
+  await a.pollOnce(); // failure #3
+  await a.pollOnce(); // success (resets)
+  await a.pollOnce(); // failure #1 (fresh counter)
+  const s = a.latest();
+  expect(s.status).toBe("unavailable");
+  expect(s.stale).toBe(true);
+  expect(s.value?.[0].title).toBe("Standup"); // cached, not null
+});
