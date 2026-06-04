@@ -4,17 +4,17 @@
 	"Author": "static74",
 	"Actions": [
 		{
-			"Name": "Counter",
-			"UUID": "com.static74.mission-control.increment",
-			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays a count, which increments by one on press.",
-			"PropertyInspectorPath": "ui/increment-counter.html",
+			"Name": "Meeting Countdown",
+			"UUID": "com.static74.mission-control.meeting-countdown",
+			"Icon": "imgs/actions/meeting/icon",
+			"Tooltip": "Mission-clock countdown to your next meeting.",
+			"PropertyInspectorPath": "ui/meeting-countdown.html",
 			"Controllers": [
 				"Keypad"
 			],
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/actions/meeting/key",
 					"TitleAlignment": "middle"
 				}
 			]

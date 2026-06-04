@@ -1,12 +1,12 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { IncrementCounter } from "./actions/increment-counter";
+import { MeetingCountdownAction } from "./actions/meeting-countdown";
 
-// We can enable "trace" logging so that all messages between the Stream Deck, and the plugin are recorded. When storing sensitive information
-streamDeck.logger.setLevel("trace");
+// NOTE: we deliberately do NOT call streamDeck.logger.setLevel("trace").
+// At "trace" the SDK serializes every WebSocket frame to the on-disk plugin log,
+// and the settings frames carry the secret iCal URL (a read credential for the
+// whole calendar). The default level ("info") keeps that credential off disk.
 
-// Register the increment action.
-streamDeck.actions.registerAction(new IncrementCounter());
+streamDeck.actions.registerAction(new MeetingCountdownAction());
 
-// Finally, connect to the Stream Deck.
 streamDeck.connect();
