@@ -93,7 +93,10 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
       return CRUISE_MS;
     }
     if (snap.status === "unavailable" && snap.value === null) {
-      void ev.action.setImage(toDataUri(renderCountdown({ state: "idle", title: "", big: "NO LINK" })));
+      // M3: on first load (fetchedAt === 0) no poll has completed yet — show a
+      // neutral acquiring frame instead of the fault state so there's no flash.
+      const big = snap.fetchedAt === 0 ? "SYNC" : "NO LINK";
+      void ev.action.setImage(toDataUri(renderCountdown({ state: "idle", title: "", big })));
       return CRUISE_MS;
     }
 
