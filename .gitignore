@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+*.log
+npm-debug.log*
+
+# Build output
+dist/
+
+# Compiled Swift spike binaries (source is tracked; binaries are built locally)
+spike/calendar-spike
+spike/slack-spike
+spike/spawn-check
