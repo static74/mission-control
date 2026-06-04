@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Meeting Countdown Settings</title>
+  <!--
+    Local, vendored sdpi-components v4.0.1 (hash recorded in lib/sdpi-components.js.sha256).
+    NO remote scripts and NO remote fonts: required for air-gapped use and supply-chain safety.
+    Verified by inspection that the bundle makes no runtime network requests.
+  -->
+  <script src="lib/sdpi-components.js"></script>
+  <style>
+    :root {
+      /* Mission-console palette — mirrors src/theme/mission-theme.ts so the panel
+         shares the key face's language. mc-steel/mc-panel are derived neutrals
+         chosen for legible labels and input surfaces on the deep-space base. */
+      --mc-space: #0B0E1A;
+      --mc-panel: #141A2E;
+      --mc-ice: #7FE0FF;
+      --mc-white: #EAF6FF;
+      --mc-steel: #A9B7CE;
+      --mc-dim: #3A4256;
+      --mc-amber: #F5B400;
+      --mc-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+
+      /* sdpi-components theming hooks (these custom properties inherit into the
+         components' shadow DOM, which is the library's intended theming contract). */
+      --window-bg-color: var(--mc-space);
+      --font-family: var(--mc-mono);
+      --font-color: var(--mc-steel);
+      --font-size: 12px;
+      --input-bg-color: var(--mc-panel);
+      --input-font-color: var(--mc-white);
+    }
+
+    html,
+    body {
+      margin: 0;
+      background: var(--mc-space);
+      color: var(--mc-white);
+      font-family: var(--mc-mono);
+    }
+
+    body {
+      /* subtle one-shot entrance; settings panels re-open often, so keep it brief */
+      animation: mc-rise 200ms ease-out both;
+      padding-bottom: 4px;
+    }
+
+    @keyframes mc-rise {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---- Header: echoes the key's own readout + hazard chevrons ---- */
+    .mc-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 12px 12px 8px;
+      gap: 12px;
+    }
+
+    .mc-eyebrow {
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--mc-dim);
+      margin: 0 0 3px;
+    }
+
+    .mc-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--mc-ice);
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    /* decorative ghost mission-clock, mirrors the cruise readout on the key face */
+    .mc-readout {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--mc-dim);
+      opacity: 0.8;
+      animation: mc-flicker 3.2s ease-in-out infinite;
+      user-select: none;
+    }
+
+    @keyframes mc-flicker {
+      0%, 100% { opacity: 0.35; }
+      50%      { opacity: 0.85; }
+    }
+
+    /* hazard divider — the terminal-state chevron stripe, dialed way down */
+    .mc-divider {
+      height: 3px;
+      margin: 0 12px 8px;
+      background: repeating-linear-gradient(
+        -45deg,
+        var(--mc-amber) 0 8px,
+        var(--mc-space) 8px 16px
+      );
+      opacity: 0.5;
+      border-radius: 2px;
+    }
+
+    /* ---- Footer credential note ---- */
+    .mc-note {
+      margin: 12px 12px 4px;
+      padding: 8px 10px;
+      border-left: 2px solid var(--mc-amber);
+      background: rgba(245, 180, 0, 0.06);
+      color: var(--mc-steel);
+      font-size: 10.5px;
+      line-height: 1.45;
+    }
+
+    .mc-note strong {
+      color: var(--mc-white);
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="mc-header">
+    <div>
+      <p class="mc-eyebrow">Mission Control</p>
+      <h1 class="mc-title">Meeting Countdown</h1>
+    </div>
+    <div class="mc-readout" aria-hidden="true">T&#8209;&#8202;0:00</div>
+  </header>
+  <div class="mc-divider" aria-hidden="true"></div>
+
+  <!-- Secret iCal feed. Masked field: <sdpi-password> (v4 dedicated element; a bare
+       `password` attribute on <sdpi-textfield> is NOT honored in this version). -->
+  <sdpi-item label="iCal feed URL">
+    <sdpi-password setting="icalUrl" placeholder="Secret .ics URL"></sdpi-password>
+  </sdpi-item>
+
+  <!-- Minutes-out at which the clock flips to the pulsing terminal countdown. -->
+  <sdpi-item label="Terminal threshold (min)">
+    <sdpi-range setting="thresholdMinutes" min="1" max="30" default="5" step="1" showlabels></sdpi-range>
+  </sdpi-item>
+
+  <sdpi-item label="Attendees only">
+    <sdpi-checkbox setting="attendeesOnly"></sdpi-checkbox>
+  </sdpi-item>
+
+  <sdpi-item label="Has join link only">
+    <sdpi-checkbox setting="hasLinkOnly"></sdpi-checkbox>
+  </sdpi-item>
+
+  <sdpi-item label="Hide all-day">
+    <sdpi-checkbox setting="hideAllDay" default="true"></sdpi-checkbox>
+  </sdpi-item>
+
+  <sdpi-item label="Exclude titles containing">
+    <sdpi-textfield setting="excludeTitlePattern" placeholder="e.g. Focus Time"></sdpi-textfield>
+  </sdpi-item>
+
+  <p class="mc-note">
+    <strong>The iCal URL is a read credential for your entire calendar.</strong>
+    It is stored in plugin settings in plain text. If it leaks, rotate it in your
+    calendar provider to revoke access.
+  </p>
+</body>
+
+</html>
