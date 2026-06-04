@@ -46,6 +46,11 @@ function hasConferenceLink(vevent: ICAL.Component, event: ICAL.Event): boolean {
   return CONFERENCE_HOSTS.some((h) => blob.includes(h));
 }
 
+function isCancelled(vevent: ICAL.Component): boolean {
+  const status = String(vevent.getFirstPropertyValue("status") ?? "").toUpperCase();
+  return status === "CANCELLED";
+}
+
 /**
  * Parse ICS text into upcoming CalEvent occurrences within [now, now+windowMs].
  * Recurring events are expanded (RRULE), honoring EXDATE and RECURRENCE-ID overrides.
@@ -60,14 +65,13 @@ export function parseIcs(text: string, now: number, windowMs: number, ownerEmail
 
   for (const vevent of vcalendar.getAllSubcomponents("vevent")) {
     const event = new ICAL.Event(vevent);
-    const fixed = {
-      title: event.summary ?? "(no title)",
-      allDay: event.startDate.isDate,
-      calendarName,
-      attendeeCount: attendeeCountExcludingOwner(vevent, ownerEmail),
-      hasLink: hasConferenceLink(vevent, event),
-      declined: ownerDeclined(vevent, ownerEmail),
-    };
+
+    // C1: skip RECURRENCE-ID exception VEVENTs at top level — they are
+    // absorbed by getOccurrenceDetails() when expanding the master.
+    if (event.isRecurrenceException()) continue;
+
+    // I2: skip cancelled master events
+    if (isCancelled(vevent)) continue;
 
     if (event.isRecurring()) {
       const it = event.iterator();
@@ -76,10 +80,32 @@ export function parseIcs(text: string, now: number, windowMs: number, ownerEmail
       while (next && guard++ < 5000) {
         const startMs = next.toJSDate().getTime();
         if (startMs > windowEnd) break;
-        const occ = event.getOccurrenceDetails(next);   // honors RECURRENCE-ID overrides
+        const occ = event.getOccurrenceDetails(next); // honors RECURRENCE-ID overrides
         const endMs = occ.endDate.toJSDate().getTime();
+
+        // C2 + I2: use the per-occurrence component for metadata so that an
+        // overridden occurrence (RECURRENCE-ID) reflects its own attendees,
+        // title, link, and declined status, not the master's snapshot.
+        const occComp = occ.item.component;
+
+        // I2: skip occurrences individually cancelled via a RECURRENCE-ID override
+        if (isCancelled(occComp)) {
+          next = it.next();
+          continue;
+        }
+
         if (endMs >= now) {
-          out.push({ ...fixed, start: occ.startDate.toJSDate().getTime(), end: endMs });
+          const occEvent = occ.item; // ICAL.Event for this occurrence
+          out.push({
+            title: occEvent.summary ?? "(no title)",
+            allDay: occ.startDate.isDate,
+            calendarName,
+            attendeeCount: attendeeCountExcludingOwner(occComp, ownerEmail),
+            hasLink: hasConferenceLink(occComp, occEvent),
+            declined: ownerDeclined(occComp, ownerEmail),
+            start: occ.startDate.toJSDate().getTime(),
+            end: endMs,
+          });
         }
         next = it.next();
       }
@@ -87,7 +113,16 @@ export function parseIcs(text: string, now: number, windowMs: number, ownerEmail
       const startMs = event.startDate.toJSDate().getTime();
       const endMs = event.endDate.toJSDate().getTime();
       if (startMs <= windowEnd && endMs >= now) {
-        out.push({ ...fixed, start: startMs, end: endMs });
+        out.push({
+          title: event.summary ?? "(no title)",
+          allDay: event.startDate.isDate,
+          calendarName,
+          attendeeCount: attendeeCountExcludingOwner(vevent, ownerEmail),
+          hasLink: hasConferenceLink(vevent, event),
+          declined: ownerDeclined(vevent, ownerEmail),
+          start: startMs,
+          end: endMs,
+        });
       }
     }
   }
