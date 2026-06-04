@@ -1,0 +1,25 @@
+import { expect, test } from "vitest";
+import { pickState } from "./countdown-state";
+
+const MIN = 60_000;
+const NOW = 10_000_000;
+const threshold = 5;
+
+test("null meeting is idle", () => {
+  expect(pickState(NOW, null, threshold)).toBe("idle");
+});
+test("more than threshold away is cruise", () => {
+  expect(pickState(NOW, { start: NOW + 6 * MIN, end: NOW + 36 * MIN }, threshold)).toBe("cruise");
+});
+test("exactly at threshold is terminal", () => {
+  expect(pickState(NOW, { start: NOW + 5 * MIN, end: NOW + 35 * MIN }, threshold)).toBe("terminal");
+});
+test("inside five minutes is terminal", () => {
+  expect(pickState(NOW, { start: NOW + 90_000, end: NOW + 30 * MIN }, threshold)).toBe("terminal");
+});
+test("just started is liftoff", () => {
+  expect(pickState(NOW, { start: NOW - 1000, end: NOW + 30 * MIN }, threshold)).toBe("liftoff");
+});
+test("past the grace window is idle", () => {
+  expect(pickState(NOW, { start: NOW - 20 * MIN, end: NOW + 10 * MIN }, threshold)).toBe("idle");
+});
