@@ -32,11 +32,18 @@ This repo (git root `/Users/sb/claude/stream-deck/`) holds **Mission Control**, 
 - Deleted: `src/actions/increment-counter.ts`, `ui/increment-counter.html`, `imgs/actions/counter/`.
 
 **What I verified here vs. what only Shane can verify on the device:**
-- Verified here: `npm run build` succeeds and regenerates `bin/plugin.js`, `tsc --noEmit` clean, 46 tests pass, manifest is valid JSON with a PI path that resolves, the PI loads only the local script (no remote refs), the sdpi bundle makes no network calls, and the plugin restarts clean.
-- NOT verified here (needs the physical Stream Deck + Shane's real feed): the key actually rendering each state, and the PI rendering/masking visually on the device.
+- Verified here: `npm run build` succeeds and regenerates `bin/plugin.js`; `tsc --noEmit` clean; 46 tests pass; manifest is valid JSON with a PI path that resolves; the PI loads only the local script (no remote refs).
+- Runtime (not just the CLI ack): the plugin log `logs/com.static74.mission-control.0.log` shows a clean startup — registration parameters received, both "Stream Deck +" devices enumerated, NO ERROR/exception entries. The action registered without throwing.
+- Credential-off-disk (airtight): across the whole SDK `dist/`, the settings payload is serialized only at the two `trace` calls in `connection.js` (74, 137); nothing logs settings at info/debug/warn/error. The plugin runs at `debug` (manifest `Nodejs.Debug` enabled), and `trace` is suppressed at `debug`, so the secret URL never reaches the log.
+- Air-gap (scoped): the sdpi bundle loads no remote scripts/fonts/resources and makes no external requests; its only socket is `ws://localhost` (the Stream Deck PI connection, inherent to the model).
+- NOT verified here (needs the physical Stream Deck + Shane's real feed): the key actually rendering each state, and the PI rendering and URL-masking visually on the device.
 
 **Next steps (resume HERE, in order):**
-- [ ] **Phase 7 (ON DEVICE, needs Shane + a FRESH secret iCal URL):** drop "Meeting Countdown" on a key; with no URL it should show `SET URL`, then `SYNC` briefly on first load, then the countdown after a poll. Walk each state: cruise (`T- 20m`, calm ice), terminal (pulsing amber<->red `MM:SS` ticking each second), liftoff (red `NOW`), and the fault behavior (toggle Wi-Fi to confirm it holds the last value as stale then recovers; a bad URL shows `NO LINK`). Confirm the PI renders themed with the URL field masked and no network access, and that switching the Stream Deck to another page and back stops then resumes the redraw timer (no runaway CPU). The plan's Phase 7 has the exact step list.
+- [ ] **Phase 7 (ON DEVICE, needs Shane + a FRESH secret iCal URL):**
+  - [ ] **FIRST, confirm the URL field is MASKED.** It uses `<sdpi-password setting="icalUrl">` (the inferred-but-unobserved deviation). If it renders as plain visible text, fall back to the plan's known-good `<sdpi-textfield setting="icalUrl">` (drops masking but keeps the binding) and note it.
+  - [ ] Drop "Meeting Countdown" on a key; with no URL it should show `SET URL`, then `SYNC` briefly on first load, then the countdown after a poll.
+  - [ ] Walk each state: cruise (`T- 20m`, calm ice), terminal (pulsing amber<->red `MM:SS` ticking each second), liftoff (red `NOW`), and the fault behavior (toggle Wi-Fi to confirm it holds the last value as stale then recovers; a bad URL shows `NO LINK`).
+  - [ ] Confirm the PI renders themed and that switching the Stream Deck to another page and back stops then resumes the redraw timer (no runaway CPU). The plan's Phase 7 has the exact step list.
 - [ ] **Polish (non-blocking):** replace the placeholder meeting icons with space-themed art; optionally `streamdeck pack com.static74.mission-control.sdPlugin` for distribution.
 - [ ] **Later milestone:** the Slack Comms action (its own adapter reading the Slack Dock badge; `AXStatusLabel` on macOS 26 is UNPROVEN, treat as a fresh feasibility check). Fully independent of the calendar action.
 

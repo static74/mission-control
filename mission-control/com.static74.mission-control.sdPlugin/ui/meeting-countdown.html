@@ -7,7 +7,9 @@
   <!--
     Local, vendored sdpi-components v4.0.1 (hash recorded in lib/sdpi-components.js.sha256).
     NO remote scripts and NO remote fonts: required for air-gapped use and supply-chain safety.
-    Verified by inspection that the bundle makes no runtime network requests.
+    Verified by inspection: the bundle loads no remote scripts, fonts, or resources and
+    makes no external network requests. Its only socket is the Stream Deck localhost PI
+    connection (ws://localhost), which is inherent to the property-inspector model.
   -->
   <script src="lib/sdpi-components.js"></script>
   <style>
