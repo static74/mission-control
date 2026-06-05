@@ -42,7 +42,7 @@ This repo (git root `/Users/sb/claude/stream-deck/`) holds **Mission Control**, 
 - **Two-line title (`21ccb64`):** `render-countdown.ts` now wraps the title via a pure, code-point-aware `wrapTitle()` (greedy word wrap, max two lines, hard-break over-long words, ellipsis on overflow) at 22px (was a hard 14-char single line at 18px). Code-point slicing keeps emoji in titles from splitting.
 - **MM:SS threshold (`1d2649a`):** the slider is replaced by a validated `<sdpi-textfield>` (`pattern="[0-9]{1,2}:[0-5][0-9]"`, default `05:00`). New pure `domain/threshold.ts#parseThresholdSeconds` validates and the action parses defensively (falls back to `DEFAULT_THRESHOLD_SECONDS` when empty/invalid; the stored string is never trusted). `pickState` now takes `thresholdMs` (precise) instead of whole minutes.
 
-**Open decision (flagged to Shane, not yet decided):** the MM:SS pattern allows up to 99 minutes; a very large threshold means long stretches of 1-second terminal redraws. Whether to cap it (e.g. 30:00, the old slider max) is Shane's call.
+**Threshold cap (decided + done, `ae37c78`):** Shane chose to cap at 30:00. `parseThresholdSeconds` clamps to `MAX_THRESHOLD_SECONDS` (1800s); the PI `pattern` was tightened to `(0?[0-9]|1[0-9]|2[0-9]):[0-5][0-9]|30:00` so the field shows invalid above the ceiling (regex verified against boundary cases in node). 69 tests passing.
 
 **Next steps (resume HERE, in order):**
 - [ ] **Quick device re-check of the two refinements:** confirm a long meeting title wraps to two readable lines (ellipsis only when it overflows), and that the MM:SS field shows invalid styling on bad input (e.g. `9:99`) while a valid value like `02:30` drives the terminal flip at the right time.

@@ -146,13 +146,13 @@
   </sdpi-item>
 
   <!-- How long before the meeting the clock flips to the pulsing terminal countdown.
-       Entered as MM:SS. The pattern validates the shape live (1-2 digit minutes,
-       seconds 00-59); the plugin parses it defensively and falls back to 05:00 if
-       the field is empty or invalid. -->
-  <sdpi-item label="Terminal threshold (MM:SS)">
+       Entered as MM:SS, valid range 00:00 to 30:00. The pattern validates the shape
+       and the 30:00 ceiling live; the plugin also parses it defensively, falling back
+       to 05:00 when empty/invalid and capping at 30:00. -->
+  <sdpi-item label="Terminal threshold (MM:SS, max 30:00)">
     <sdpi-textfield
       setting="thresholdMmss"
-      pattern="[0-9]{1,2}:[0-5][0-9]"
+      pattern="(0?[0-9]|1[0-9]|2[0-9]):[0-5][0-9]|30:00"
       placeholder="MM:SS"
       default="05:00"
       maxlength="5"

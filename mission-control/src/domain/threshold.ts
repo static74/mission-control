@@ -10,8 +10,14 @@
 export function parseThresholdSeconds(input: string): number | null {
   const m = input.trim().match(/^(\d{1,2}):([0-5]\d)$/);
   if (!m) return null;
-  return Number(m[1]) * 60 + Number(m[2]);
+  const total = Number(m[1]) * 60 + Number(m[2]);
+  // Cap at the ceiling: a larger threshold means long stretches of 1-second
+  // terminal redraws for little benefit.
+  return Math.min(total, MAX_THRESHOLD_SECONDS);
 }
 
 /** Default terminal threshold when the setting is empty or invalid: 05:00. */
 export const DEFAULT_THRESHOLD_SECONDS = 5 * 60;
+
+/** Upper bound on the terminal threshold: 30:00 (matches the prior slider max). */
+export const MAX_THRESHOLD_SECONDS = 30 * 60;
