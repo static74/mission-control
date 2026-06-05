@@ -10,13 +10,14 @@ import type { JsonValue } from "@elgato/utils";
 import { getCalendarAdapter } from "../adapters/calendar-registry";
 import { DEFAULT_FILTERS, selectNextMeeting, type MeetingFilters } from "../domain/meeting";
 import { pickState } from "../domain/countdown-state";
+import { parseThresholdSeconds, DEFAULT_THRESHOLD_SECONDS } from "../domain/threshold";
 import { buildBig, ringFraction } from "../domain/view-model";
 import { renderCountdown, toDataUri, type CountdownView } from "../theme/render-countdown";
 
 interface CountdownSettings {
   [key: string]: JsonValue;
   icalUrl?: string;
-  thresholdMinutes?: number;
+  thresholdMmss?: string; // manual MM:SS terminal threshold; parsed defensively
   attendeesOnly?: boolean;
   hasLinkOnly?: boolean;
   hideAllDay?: boolean;
@@ -78,7 +79,9 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     const id = ev.action.id;
     const settings = ev.payload.settings ?? {};
     const url = (settings.icalUrl ?? "").trim();
-    const threshold = settings.thresholdMinutes ?? 5;
+    // Stored value is never trusted: parse MM:SS, fall back to the default if invalid.
+    const thresholdMs =
+      (parseThresholdSeconds(settings.thresholdMmss ?? "") ?? DEFAULT_THRESHOLD_SECONDS) * 1000;
 
     if (url === "") {
       void ev.action.setImage(toDataUri(renderCountdown({ state: "idle", title: "", big: "SET URL" })));
@@ -101,7 +104,7 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     }
 
     const meeting = selectNextMeeting(snap.value ?? [], filtersFrom(settings), now);
-    const state = pickState(now, meeting, threshold);
+    const state = pickState(now, meeting, thresholdMs);
 
     let pulsePhase: 0 | 1 | undefined;
     if (state === "terminal") {

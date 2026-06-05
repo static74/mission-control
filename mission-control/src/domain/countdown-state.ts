@@ -6,11 +6,11 @@ export type CountdownState = "idle" | "cruise" | "terminal" | "liftoff";
 export function pickState(
   now: number,
   meeting: { start: number; end: number } | null,
-  thresholdMinutes: number,
+  thresholdMs: number,
 ): CountdownState {
   if (!meeting) return "idle";
   const remaining = meeting.start - now;
-  if (remaining > thresholdMinutes * 60_000) return "cruise";
+  if (remaining > thresholdMs) return "cruise";
   if (remaining > 0) return "terminal";
   if (now <= graceEnd(meeting)) return "liftoff";
   return "idle";

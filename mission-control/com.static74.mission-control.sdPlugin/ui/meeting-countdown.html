@@ -145,9 +145,18 @@
     <sdpi-password setting="icalUrl" placeholder="Secret .ics URL"></sdpi-password>
   </sdpi-item>
 
-  <!-- Minutes-out at which the clock flips to the pulsing terminal countdown. -->
-  <sdpi-item label="Terminal threshold (min)">
-    <sdpi-range setting="thresholdMinutes" min="1" max="30" default="5" step="1" showlabels></sdpi-range>
+  <!-- How long before the meeting the clock flips to the pulsing terminal countdown.
+       Entered as MM:SS. The pattern validates the shape live (1-2 digit minutes,
+       seconds 00-59); the plugin parses it defensively and falls back to 05:00 if
+       the field is empty or invalid. -->
+  <sdpi-item label="Terminal threshold (MM:SS)">
+    <sdpi-textfield
+      setting="thresholdMmss"
+      pattern="[0-9]{1,2}:[0-5][0-9]"
+      placeholder="MM:SS"
+      default="05:00"
+      maxlength="5"
+    ></sdpi-textfield>
   </sdpi-item>
 
   <sdpi-item label="Attendees only">

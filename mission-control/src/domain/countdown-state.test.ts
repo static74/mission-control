@@ -3,7 +3,7 @@ import { pickState } from "./countdown-state";
 
 const MIN = 60_000;
 const NOW = 10_000_000;
-const threshold = 5;
+const threshold = 5 * MIN; // thresholdMs: terminal window in milliseconds
 
 test("null meeting is idle", () => {
   expect(pickState(NOW, null, threshold)).toBe("idle");
