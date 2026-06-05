@@ -12,7 +12,7 @@ This repo (git root `/Users/sb/claude/stream-deck/`) holds **Mission Control**, 
 
 ### 2026-06-04 (session 2) - Action wired into the plugin + Property Inspector (Task 5.3 + Phase 6)
 
-**Status:** The Meeting Countdown action is now REGISTERED in the plugin entry and the plugin RESTARTS clean on the device. The Property Inspector exists, is themed, and is vendored locally (no CDN). Branch `meeting-countdown`: 46 tests passing, `tsc --noEmit` clean, working tree clean. Two new commits: `759e57a` (Task 5.3), `d971477` (Phase 6). It has NOT been verified rendering on the physical key yet; that is Phase 7, which needs Shane on the device with a fresh secret iCal URL.
+**Status:** The Meeting Countdown action is wired in, runs on the device, and Phase 7 device verification is DONE (Shane confirmed live: URL masking, terminal state, fault/stale recovery, and the page-switch lifecycle). Two on-device refinements then landed: a two-line title with a larger font, and a validated MM:SS threshold field replacing the slider. Branch `meeting-countdown`: 64 tests passing, `tsc --noEmit` clean, working tree clean. Commits this session: `759e57a` (Task 5.3), `d971477` (Phase 6), `2d259d7` (security-claim precision), `21ccb64` (title wrap), `1d2649a` (MM:SS threshold).
 
 **What we accomplished:**
 - **Task 5.3:** Registered `MeetingCountdownAction` in `src/plugin.ts`; swapped the manifest `Actions` entry from the scaffold Counter to Meeting Countdown (`Controllers: ["Keypad"]`, `PropertyInspectorPath: "ui/meeting-countdown.html"`, `imgs/actions/meeting/...`); deleted the scaffold sample (`increment-counter.ts`, its PI, its icons); added placeholder meeting icons by copying the counter PNGs (dimensions already manifest-valid). Built and restarted on the device clean.
@@ -38,12 +38,14 @@ This repo (git root `/Users/sb/claude/stream-deck/`) holds **Mission Control**, 
 - Air-gap (scoped): the sdpi bundle loads no remote scripts/fonts/resources and makes no external requests; its only socket is `ws://localhost` (the Stream Deck PI connection, inherent to the model).
 - NOT verified here (needs the physical Stream Deck + Shane's real feed): the key actually rendering each state, and the PI rendering and URL-masking visually on the device.
 
+**On-device refinements this session (TDD, then verified on the deck):**
+- **Two-line title (`21ccb64`):** `render-countdown.ts` now wraps the title via a pure, code-point-aware `wrapTitle()` (greedy word wrap, max two lines, hard-break over-long words, ellipsis on overflow) at 22px (was a hard 14-char single line at 18px). Code-point slicing keeps emoji in titles from splitting.
+- **MM:SS threshold (`1d2649a`):** the slider is replaced by a validated `<sdpi-textfield>` (`pattern="[0-9]{1,2}:[0-5][0-9]"`, default `05:00`). New pure `domain/threshold.ts#parseThresholdSeconds` validates and the action parses defensively (falls back to `DEFAULT_THRESHOLD_SECONDS` when empty/invalid; the stored string is never trusted). `pickState` now takes `thresholdMs` (precise) instead of whole minutes.
+
+**Open decision (flagged to Shane, not yet decided):** the MM:SS pattern allows up to 99 minutes; a very large threshold means long stretches of 1-second terminal redraws. Whether to cap it (e.g. 30:00, the old slider max) is Shane's call.
+
 **Next steps (resume HERE, in order):**
-- [ ] **Phase 7 (ON DEVICE, needs Shane + a FRESH secret iCal URL):**
-  - [ ] **FIRST, confirm the URL field is MASKED.** It uses `<sdpi-password setting="icalUrl">` (the inferred-but-unobserved deviation). If it renders as plain visible text, fall back to the plan's known-good `<sdpi-textfield setting="icalUrl">` (drops masking but keeps the binding) and note it.
-  - [ ] Drop "Meeting Countdown" on a key; with no URL it should show `SET URL`, then `SYNC` briefly on first load, then the countdown after a poll.
-  - [ ] Walk each state: cruise (`T- 20m`, calm ice), terminal (pulsing amber<->red `MM:SS` ticking each second), liftoff (red `NOW`), and the fault behavior (toggle Wi-Fi to confirm it holds the last value as stale then recovers; a bad URL shows `NO LINK`).
-  - [ ] Confirm the PI renders themed and that switching the Stream Deck to another page and back stops then resumes the redraw timer (no runaway CPU). The plan's Phase 7 has the exact step list.
+- [ ] **Quick device re-check of the two refinements:** confirm a long meeting title wraps to two readable lines (ellipsis only when it overflows), and that the MM:SS field shows invalid styling on bad input (e.g. `9:99`) while a valid value like `02:30` drives the terminal flip at the right time.
 - [ ] **Polish (non-blocking):** replace the placeholder meeting icons with space-themed art; optionally `streamdeck pack com.static74.mission-control.sdPlugin` for distribution.
 - [ ] **Later milestone:** the Slack Comms action (its own adapter reading the Slack Dock badge; `AXStatusLabel` on macOS 26 is UNPROVEN, treat as a fresh feasibility check). Fully independent of the calendar action.
 
