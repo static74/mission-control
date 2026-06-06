@@ -192,6 +192,15 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     const meeting = selectNextMeeting(snap.value ?? [], filtersFrom(settings), now);
     const state = pickState(now, meeting, thresholdMs);
 
+    // Forensic breadcrumb (kept intentionally): log whenever the key sits on NOW, so any
+    // future unexpected NOW is traceable to the exact meeting that caused it. Fires at most
+    // once per redraw (~once/min) and only while a meeting is genuinely ongoing.
+    if (state === "liftoff" && meeting) {
+      streamDeck.logger.info(
+        `[mc] NOW "${meeting.title}" ${new Date(meeting.start).toISOString()}..${new Date(meeting.end).toISOString()}`,
+      );
+    }
+
     let pulsePhase: 0 | 1 | undefined;
     if (state === "terminal") {
       pulsePhase = this.pulse.get(id) === 1 ? 0 : 1;
