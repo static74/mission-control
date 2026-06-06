@@ -19,5 +19,8 @@ export function parseThresholdSeconds(input: string): number | null {
 /** Default terminal threshold when the setting is empty or invalid: 05:00. */
 export const DEFAULT_THRESHOLD_SECONDS = 5 * 60;
 
+/** The default as the MM:SS string the PI field shows; must equal DEFAULT_THRESHOLD_SECONDS. */
+export const DEFAULT_THRESHOLD_MMSS = "05:00";
+
 /** Upper bound on the terminal threshold: 30:00 (matches the prior slider max). */
 export const MAX_THRESHOLD_SECONDS = 30 * 60;

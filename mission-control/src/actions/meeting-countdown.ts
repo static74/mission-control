@@ -13,7 +13,7 @@ import type { JsonValue } from "@elgato/utils";
 import { getCalendarAdapter } from "../adapters/calendar-registry";
 import { DEFAULT_FILTERS, selectNextMeeting, type MeetingFilters } from "../domain/meeting";
 import { pickState } from "../domain/countdown-state";
-import { parseThresholdSeconds, DEFAULT_THRESHOLD_SECONDS } from "../domain/threshold";
+import { parseThresholdSeconds, DEFAULT_THRESHOLD_SECONDS, DEFAULT_THRESHOLD_MMSS } from "../domain/threshold";
 import { buildBig, ringFraction } from "../domain/view-model";
 import { renderCountdown, toDataUri, type CountdownView } from "../theme/render-countdown";
 import { glowColor } from "../theme/glow";
@@ -72,6 +72,13 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
   private readonly audioControl: AudioControl = getAudioControl();
 
   override onWillAppear(ev: WillAppearEvent<CountdownSettings>): void {
+    // Seed the default terminal threshold so the PI field shows 05:00 instead of blank.
+    // sdpi only falls back to the `default` attribute when the setting is undefined; an
+    // empty-string setting renders blank, so persist a real value when it's missing/blank.
+    const s = ev.payload.settings ?? {};
+    if (!(s.thresholdMmss ?? "").trim()) {
+      void ev.action.setSettings({ ...s, thresholdMmss: DEFAULT_THRESHOLD_MMSS });
+    }
     this.scheduleNext(ev as unknown as Ctx, 0);
   }
 
