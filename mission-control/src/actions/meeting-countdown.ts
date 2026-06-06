@@ -189,7 +189,8 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
       return CRUISE_MS;
     }
 
-    const meeting = selectNextMeeting(snap.value ?? [], filtersFrom(settings), now);
+    // thresholdMs also lets an imminent next meeting override an ongoing meeting's NOW.
+    const meeting = selectNextMeeting(snap.value ?? [], filtersFrom(settings), now, thresholdMs);
     const state = pickState(now, meeting, thresholdMs);
 
     // Forensic breadcrumb (kept intentionally): log whenever the key sits on NOW, so any

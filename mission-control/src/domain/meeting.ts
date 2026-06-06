@@ -35,13 +35,25 @@ export function qualifies(e: CalEvent, f: MeetingFilters): boolean {
   return true;
 }
 
-/** Earliest qualifying event not yet past its grace window. */
-export function selectNextMeeting(events: CalEvent[], filters: MeetingFilters, now: number): CalEvent | null {
+/**
+ * Pick the meeting the key should track. Normally the earliest qualifying event that
+ * hasn't ended. Exception: an *imminent* upcoming meeting (starting within `thresholdMs`)
+ * overrides an ongoing meeting's NOW, so "your next meeting is close" wins over "you're in
+ * a meeting". `thresholdMs` defaults to 0 (no override — an ongoing meeting keeps NOW).
+ */
+export function selectNextMeeting(
+  events: CalEvent[],
+  filters: MeetingFilters,
+  now: number,
+  thresholdMs = 0,
+): CalEvent | null {
   const candidates = events
     .filter((e) => qualifies(e, filters))
     .filter((e) => graceEnd(e) >= now)
     .sort((a, b) => a.start - b.start);
-  return candidates[0] ?? null;
+  const upcoming = candidates.find((e) => e.start > now);
+  if (upcoming && upcoming.start - now <= thresholdMs) return upcoming; // imminent next meeting wins
+  return candidates.find((e) => e.start <= now) ?? upcoming ?? null;
 }
 
 export const DEFAULT_FILTERS: MeetingFilters = {

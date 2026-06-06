@@ -58,3 +58,29 @@ test("keeps a long meeting that is still ongoing (no 15-min cap)", () => {
   const events = [ev({ start: NOW - 20 * 60_000, end: NOW + 40 * 60_000, title: "Long" })];
   expect(selectNextMeeting(events, base, NOW)?.title).toBe("Long");
 });
+
+test("an imminent next meeting (within threshold) overrides an ongoing NOW", () => {
+  const events = [
+    ev({ start: NOW - 10 * 60_000, end: NOW + 20 * 60_000, title: "Ongoing" }),
+    ev({ start: NOW + 3 * 60_000, end: NOW + 30 * 60_000, title: "Soon" }),
+  ];
+  // threshold 5m: the next meeting is 3m out, so it wins over the ongoing NOW.
+  expect(selectNextMeeting(events, base, NOW, 5 * 60_000)?.title).toBe("Soon");
+});
+
+test("a non-imminent next meeting does NOT override an ongoing NOW", () => {
+  const events = [
+    ev({ start: NOW - 10 * 60_000, end: NOW + 20 * 60_000, title: "Ongoing" }),
+    ev({ start: NOW + 30 * 60_000, end: NOW + 60 * 60_000, title: "Later" }),
+  ];
+  // threshold 5m: the next meeting is 30m out, so the ongoing meeting keeps NOW.
+  expect(selectNextMeeting(events, base, NOW, 5 * 60_000)?.title).toBe("Ongoing");
+});
+
+test("with no override threshold, an ongoing meeting is preferred over a future one", () => {
+  const events = [
+    ev({ start: NOW - 10 * 60_000, end: NOW + 20 * 60_000, title: "Ongoing" }),
+    ev({ start: NOW + 3 * 60_000, end: NOW + 30 * 60_000, title: "Soon" }),
+  ];
+  expect(selectNextMeeting(events, base, NOW)?.title).toBe("Ongoing");
+});
