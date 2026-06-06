@@ -96,6 +96,8 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     const current = this.audio.get(id) ?? (await this.audioControl.current());
     const target = nextOutputTarget(current ?? null, normal, meeting);
     const result = await this.audioControl.setOutput(target); // read-back: never assume the switch took
+    // The key may have disappeared during the switch; don't re-arm a hidden page.
+    if (!this.timers.has(id)) return;
     this.audio.set(id, result);
     this.audioPolledAt.set(id, Date.now());
     this.scheduleNext(ev as unknown as Ctx, 0);
@@ -133,13 +135,19 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     void this.audioControl
       .current()
       .then((out) => {
+        // If the key disappeared while current() was in flight, onWillDisappear has
+        // cleared the timer; do NOT resurrect the redraw loop on a hidden page.
+        if (!this.timers.has(id)) return;
         const prev = this.audio.get(id);
         this.audio.set(id, out);
         // Repaint promptly only when the device actually changed (cheap; avoids
         // re-toggling pulse on every poll).
         if ((prev?.uid ?? null) !== (out?.uid ?? null)) this.scheduleNext(ev, 0);
       })
-      .catch(() => this.audio.set(id, null));
+      .catch(() => {
+        if (!this.timers.has(id)) return;
+        this.audio.set(id, null);
+      });
   }
 
   /** Paint one frame; return the delay until the next. */
