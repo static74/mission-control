@@ -1,10 +1,12 @@
 import {
   action,
+  streamDeck,
   SingletonAction,
   type WillAppearEvent,
   type WillDisappearEvent,
   type DidReceiveSettingsEvent,
   type KeyDownEvent,
+  type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
@@ -97,6 +99,18 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     this.audio.set(id, result);
     this.audioPolledAt.set(id, Date.now());
     this.scheduleNext(ev as unknown as Ctx, 0);
+  }
+
+  /** Feed the PI's device dropdowns from the live CoreAudio device list. */
+  override async onSendToPlugin(
+    ev: SendToPluginEvent<JsonValue, CountdownSettings>,
+  ): Promise<void> {
+    const payload = ev.payload as { event?: string };
+    if (payload?.event === "getOutputDevices") {
+      const devices = await this.audioControl.list();
+      const items = devices.map((d) => ({ label: d.name, value: d.uid }));
+      await streamDeck.ui.sendToPropertyInspector({ event: "getOutputDevices", items });
+    }
   }
 
   /** Self-rescheduling redraw loop; cadence depends on the current state. */

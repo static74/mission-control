@@ -175,6 +175,17 @@
     <sdpi-textfield setting="excludeTitlePattern" placeholder="e.g. Focus Time"></sdpi-textfield>
   </sdpi-item>
 
+  <!-- Audio output devices for Meeting Mode. Options are the live CoreAudio devices
+       reported by the bundled helper (datasource "getOutputDevices"); the stored value
+       is the device uid. macOS only — empty on other platforms. -->
+  <sdpi-item label="Normal output device">
+    <sdpi-select setting="normalDevice" datasource="getOutputDevices" placeholder="Your normal output"></sdpi-select>
+  </sdpi-item>
+
+  <sdpi-item label="Meeting output device">
+    <sdpi-select setting="meetingDevice" datasource="getOutputDevices" placeholder="Your meeting output"></sdpi-select>
+  </sdpi-item>
+
   <p class="mc-note">
     <strong>The iCal URL is a read credential for your entire calendar.</strong>
     It is stored in plugin settings in plain text. If it leaks, rotate it in your
