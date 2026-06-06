@@ -32,7 +32,7 @@ export class CalendarAdapter implements SourceAdapter<CalEvent[]> {
     this.fetchText = deps.fetchText ?? defaultFetchText;
     this.now = deps.now ?? (() => Date.now());
     this.windowMs = deps.windowMs ?? 36 * 60 * 60 * 1000; // look 36h ahead
-    this.pollMs = deps.pollMs ?? 5 * 60 * 1000;           // feeds change slowly
+    this.pollMs = deps.pollMs ?? 60 * 1000;               // re-fetch the feed every 60s for timely updates
     this.ownerEmail = ownerEmailFromUrl(url);
   }
 
