@@ -6,5 +6,6 @@ export const THEME = {
   amber: "#F5B400",   // caution (terminal pulse phase 0)
   red: "#E0383B",     // critical (terminal pulse phase 1)
   dim: "#3A4256",     // idle / low-emphasis text
+  meetingGlow: "#FFD23F", // meeting-mode glow base (yellow); swaps to `white` in terminal/liftoff
   font: "ui-monospace, 'SF Mono', Menlo, monospace",
 } as const;

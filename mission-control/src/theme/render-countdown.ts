@@ -7,6 +7,7 @@ export interface CountdownView {
   big: string;               // main readout: "T- 1:24" | "04:59" | "NOW" | "CLEAR" | "SET URL"
   pulsePhase?: 0 | 1;        // terminal alternation; toggled by the action each redraw
   ringFraction?: number;     // 0..1 cruise orbit-ring depletion (1 = far away)
+  glow?: string | null;      // meeting-mode edge glow color; null/undefined = no glow
 }
 
 const SIZE = 144;
@@ -93,6 +94,27 @@ function orbitRing(fraction: number): string {
       opacity="0.45" stroke-dasharray="${dash} ${circ}" transform="rotate(-90 ${c} ${c})"/>`;
 }
 
+/**
+ * Faux inner-edge glow: a few inset rounded strokes, brightest at the edge and fading
+ * inward. Deliberately filter-free — feGaussianBlur support in the Stream Deck SVG
+ * renderer is unverified, but layered strokes render everywhere. Tune insets/opacity
+ * on the device if the falloff reads poorly.
+ */
+function glowFrame(color: string): string {
+  const layers = [
+    { inset: 2, width: 4, opacity: 0.95 },
+    { inset: 6, width: 4, opacity: 0.5 },
+    { inset: 11, width: 5, opacity: 0.22 },
+  ];
+  return layers
+    .map(({ inset, width, opacity }) => {
+      const size = SIZE - 2 * inset;
+      return `<rect x="${inset}" y="${inset}" width="${size}" height="${size}" rx="10" ry="10"
+        fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}"/>`;
+    })
+    .join("");
+}
+
 /** Render the title as one or two centered lines at the top of the key. */
 function titleBlock(title: string): string {
   const lines = wrapTitle(title, TITLE_MAX_CHARS, TITLE_MAX_LINES);
@@ -117,6 +139,7 @@ export function renderCountdown(v: CountdownView): string {
     `<text x="${SIZE / 2}" y="${SIZE / 2 + 14}" fill="${bigColor(v)}" font-family="${THEME.font}"
       font-size="${bigSize}" font-weight="700" text-anchor="middle">${esc(v.big)}</text>`,
   );
+  if (v.glow) parts.push(glowFrame(v.glow));
   return `<svg width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
 }
 

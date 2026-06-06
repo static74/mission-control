@@ -64,3 +64,16 @@ test("renderCountdown draws a short title as a single line", () => {
   const textCount = (svg.match(/<text/g) ?? []).length;
   expect(textCount).toBe(2); // one title line + the big readout
 });
+
+// --- meeting-mode glow frame ---
+
+test("no glow frame when glow is unset", () => {
+  expect(renderCountdown(view({}))).not.toContain(THEME.meetingGlow);
+});
+test("draws a glow frame in the glow color when set", () => {
+  const svg = renderCountdown(view({ glow: THEME.meetingGlow }));
+  expect(svg).toContain(`stroke="${THEME.meetingGlow}"`);
+});
+test("null glow draws no frame", () => {
+  expect(renderCountdown(view({ glow: null }))).not.toContain(THEME.meetingGlow);
+});
