@@ -1,9 +1,10 @@
 {
-    "scripts": {
-        "test": "vitest run",
-        "build": "rollup -c",
-        "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.static74.mission-control\""
-    },
+	"scripts": {
+		"test": "vitest run",
+		"build:helper": "node scripts/build-helper.mjs",
+		"build": "npm run build:helper && rollup -c",
+		"watch": "npm run build:helper && rollup -c -w --watch.onEnd=\"streamdeck restart com.static74.mission-control\""
+	},
     "type": "module",
     "devDependencies": {
         "@elgato/cli": "^1.7.4",
