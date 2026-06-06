@@ -52,3 +52,9 @@ test("drops a meeting past its grace window", () => {
   const events = [ev({ start: NOW - 60 * 60_000, end: NOW - 59 * 60_000 })];
   expect(selectNextMeeting(events, base, NOW)).toBeNull();
 });
+
+test("keeps a long meeting that is still ongoing (no 15-min cap)", () => {
+  // Started 20m ago, ends in 40m: still going, so it stays selected (shows NOW).
+  const events = [ev({ start: NOW - 20 * 60_000, end: NOW + 40 * 60_000, title: "Long" })];
+  expect(selectNextMeeting(events, base, NOW)?.title).toBe("Long");
+});

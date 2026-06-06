@@ -16,11 +16,13 @@ export interface MeetingFilters {
   excludeTitlePattern: string; // case-insensitive substring; "" = none
 }
 
-export const GRACE_CAP_MS = 15 * 60 * 1000;
-
-/** End of a meeting's "NOW" window: its end time, capped 15 min after start. */
+/**
+ * End of a meeting's "NOW" window: its actual end time. NOW (liftoff) shows only
+ * while the meeting is ongoing (start..end), so a finished meeting clears at once and
+ * a long meeting keeps showing NOW for its full duration.
+ */
 export function graceEnd(e: { start: number; end: number }): number {
-  return Math.min(e.end, e.start + GRACE_CAP_MS);
+  return e.end;
 }
 
 export function qualifies(e: CalEvent, f: MeetingFilters): boolean {

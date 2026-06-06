@@ -20,6 +20,10 @@ test("inside five minutes is terminal", () => {
 test("just started is liftoff", () => {
   expect(pickState(NOW, { start: NOW - 1000, end: NOW + 30 * MIN }, threshold)).toBe("liftoff");
 });
-test("past the grace window is idle", () => {
-  expect(pickState(NOW, { start: NOW - 20 * MIN, end: NOW + 10 * MIN }, threshold)).toBe("idle");
+test("an ongoing meeting (started, not yet ended) is liftoff", () => {
+  // NOW shows for the whole meeting now — until it actually ends, no 15-min cap.
+  expect(pickState(NOW, { start: NOW - 20 * MIN, end: NOW + 10 * MIN }, threshold)).toBe("liftoff");
+});
+test("past the meeting's end is idle", () => {
+  expect(pickState(NOW, { start: NOW - 40 * MIN, end: NOW - 10 * MIN }, threshold)).toBe("idle");
 });
