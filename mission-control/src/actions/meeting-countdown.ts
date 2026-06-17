@@ -17,7 +17,7 @@ import { parseThresholdSeconds, DEFAULT_THRESHOLD_SECONDS, DEFAULT_THRESHOLD_MMS
 import { buildBig, ringFraction } from "../domain/view-model";
 import { renderCountdown, toDataUri, type CountdownView } from "../theme/render-countdown";
 import { glowColor } from "../theme/glow";
-import { isMeetingMode, nextOutputTarget } from "../domain/meeting-mode";
+import { isMeetingMode, nextOutputTarget, webhookForTransition } from "../domain/meeting-mode";
 import { getAudioControl } from "../audio/audio-control-registry";
 import {
   DEFAULT_MEETING_DEVICE,
@@ -36,6 +36,8 @@ interface CountdownSettings {
   excludeTitlePattern?: string;
   normalDevice?: string; // uid (from the PI dropdown) or provisional name
   meetingDevice?: string; // uid (from the PI dropdown) or provisional name
+  meetingModeWebhook?: string; // HA webhook POSTed when a press enters meeting mode
+  noMeetingWebhook?: string;   // HA webhook POSTed when a press leaves meeting mode
 }
 
 const CRUISE_MS = 60_000;
@@ -96,10 +98,11 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     this.scheduleNext(ev as unknown as Ctx, 0);
   }
 
-  /** Press toggles the audio output, then repaints from the read-back truth. */
+  /** Press toggles the audio output, repaints from the read-back truth, and notifies HA on a confirmed flip. */
   override async onKeyDown(ev: KeyDownEvent<CountdownSettings>): Promise<void> {
     const id = ev.action.id;
-    const { normal, meeting } = devicesFrom(ev.payload.settings ?? {});
+    const settings = ev.payload.settings ?? {};
+    const { normal, meeting } = devicesFrom(settings);
     const current = this.audio.get(id) ?? (await this.audioControl.current());
     const target = nextOutputTarget(current ?? null, normal, meeting);
     const result = await this.audioControl.setOutput(target); // read-back: never assume the switch took
@@ -107,7 +110,26 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     if (!this.timers.has(id)) return;
     this.audio.set(id, result);
     this.audioPolledAt.set(id, Date.now());
+    // Notify Home Assistant only when the read-back confirms meeting mode actually flipped.
+    const hook = webhookForTransition(
+      isMeetingMode(current ?? null, meeting),
+      isMeetingMode(result, meeting),
+      settings.meetingModeWebhook ?? "",
+      settings.noMeetingWebhook ?? "",
+    );
+    if (hook) this.notifyHomeAssistant(hook);
     this.scheduleNext(ev as unknown as Ctx, 0);
+  }
+
+  /** Fire-and-forget POST to a Home Assistant webhook. Never awaited; never blocks the press. */
+  private notifyHomeAssistant(url: string): void {
+    void fetch(url, { method: "POST" })
+      .then((res) => {
+        // A wrong/misconfigured webhook id returns 404/405 and still RESOLVES — surface it.
+        // Log the status only; the URL carries the secret webhook id.
+        if (!res.ok) streamDeck.logger.warn(`[mc] HA webhook -> HTTP ${res.status}`);
+      })
+      .catch(() => streamDeck.logger.warn(`[mc] HA webhook POST failed`));
   }
 
   /** Feed the PI's device dropdowns from the live CoreAudio device list. */
