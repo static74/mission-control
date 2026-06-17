@@ -186,6 +186,17 @@
     <sdpi-select setting="meetingDevice" datasource="getOutputDevices" placeholder="Your meeting output"></sdpi-select>
   </sdpi-item>
 
+  <!-- Home Assistant webhooks (optional). Fired only on a key press that flips meeting
+       mode: the meeting-mode URL when entering, the no-meeting URL when leaving. Stored in
+       plaintext; the webhook id is the only secret. Empty disables that direction. -->
+  <sdpi-item label="HA meeting-mode webhook URL">
+    <sdpi-textfield setting="meetingModeWebhook" placeholder="http://homeassistant.local:8123/api/webhook/..."></sdpi-textfield>
+  </sdpi-item>
+
+  <sdpi-item label="HA no-meeting webhook URL">
+    <sdpi-textfield setting="noMeetingWebhook" placeholder="http://homeassistant.local:8123/api/webhook/..."></sdpi-textfield>
+  </sdpi-item>
+
   <p class="mc-note">
     <strong>The iCal URL is a read credential for your entire calendar.</strong>
     It is stored in plugin settings in plain text. If it leaks, rotate it in your
