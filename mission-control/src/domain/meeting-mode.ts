@@ -26,3 +26,8 @@ export function webhookForTransition(
   const url = (after ? meetingModeUrl : noMeetingUrl).trim();
   return url || null;
 }
+
+/** The deterministic value handed to the Shortcut for the state being entered. */
+export function targetFor(nextOn: boolean): "meeting" | "normal" {
+  return nextOn ? "meeting" : "normal";
+}

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { isMeetingMode, nextOutputTarget, webhookForTransition } from "./meeting-mode";
+import { isMeetingMode, nextOutputTarget, webhookForTransition, targetFor } from "./meeting-mode";
 
 const dell = { uid: "uid-dell", name: "Dell U4924DW" };
 const bench = { uid: "uid-bench", name: "Benchmark 1.0" };
@@ -42,4 +42,10 @@ test("webhook: no transition fires nothing", () => {
 test("webhook: a blank relevant URL fires nothing (trimmed)", () => {
   expect(webhookForTransition(false, true, "   ", HA_CLEAR)).toBeNull();
   expect(webhookForTransition(true, false, HA_MEETING, "")).toBeNull();
+});
+test("targetFor: entering meeting mode yields 'meeting'", () => {
+  expect(targetFor(true)).toBe("meeting");
+});
+test("targetFor: leaving meeting mode yields 'normal'", () => {
+  expect(targetFor(false)).toBe("normal");
 });
