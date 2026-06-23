@@ -241,7 +241,7 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
 
     const view: CountdownView = {
       state,
-      title: meeting?.title ?? "",
+      title: state === "idle" ? "" : (meeting?.title ?? ""),
       big: buildBig(state, now, meeting),
       pulsePhase,
       ringFraction: state === "cruise" && meeting ? ringFraction(now, meeting) : undefined,
