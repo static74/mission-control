@@ -6,7 +6,6 @@ import {
   type WillDisappearEvent,
   type DidReceiveSettingsEvent,
   type KeyDownEvent,
-  type SendToPluginEvent,
 } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
@@ -17,14 +16,9 @@ import { parseThresholdSeconds, DEFAULT_THRESHOLD_SECONDS, DEFAULT_THRESHOLD_MMS
 import { buildBig, ringFraction } from "../domain/view-model";
 import { renderCountdown, toDataUri, type CountdownView } from "../theme/render-countdown";
 import { glowColor } from "../theme/glow";
-import { isMeetingMode, nextOutputTarget, webhookForTransition } from "../domain/meeting-mode";
-import { getAudioControl } from "../audio/audio-control-registry";
-import {
-  DEFAULT_MEETING_DEVICE,
-  DEFAULT_NORMAL_DEVICE,
-  type AudioControl,
-  type AudioOutput,
-} from "../audio/types";
+import { targetFor, webhookForTransition } from "../domain/meeting-mode";
+import { getShortcutRunner } from "../shortcut/shortcut-runner-registry";
+import type { ShortcutRunner } from "../shortcut/shortcut-runner";
 
 interface CountdownSettings {
   [key: string]: JsonValue;
@@ -34,15 +28,14 @@ interface CountdownSettings {
   hasLinkOnly?: boolean;
   hideAllDay?: boolean;
   excludeTitlePattern?: string;
-  normalDevice?: string; // uid (from the PI dropdown) or provisional name
-  meetingDevice?: string; // uid (from the PI dropdown) or provisional name
+  shortcutName?: string; // macOS Shortcut run on press; receives "meeting"/"normal" as input
+  meetingOn?: boolean; // app-owned meeting-mode bit, persisted across reloads
   meetingModeWebhook?: string; // HA webhook POSTed when a press enters meeting mode
-  noMeetingWebhook?: string;   // HA webhook POSTed when a press leaves meeting mode
+  noMeetingWebhook?: string; // HA webhook POSTed when a press leaves meeting mode
 }
 
 const CRUISE_MS = 60_000;
 const TERMINAL_MS = 1_000;
-const AUDIO_POLL_MS = 5_000; // catch audio changes made outside the plugin
 
 function filtersFrom(s: CountdownSettings): MeetingFilters {
   return {
@@ -50,13 +43,6 @@ function filtersFrom(s: CountdownSettings): MeetingFilters {
     hasLinkOnly: s.hasLinkOnly ?? DEFAULT_FILTERS.hasLinkOnly,
     hideAllDay: s.hideAllDay ?? DEFAULT_FILTERS.hideAllDay,
     excludeTitlePattern: s.excludeTitlePattern ?? DEFAULT_FILTERS.excludeTitlePattern,
-  };
-}
-
-function devicesFrom(s: CountdownSettings): { normal: string; meeting: string } {
-  return {
-    normal: (s.normalDevice ?? "").trim() || DEFAULT_NORMAL_DEVICE,
-    meeting: (s.meetingDevice ?? "").trim() || DEFAULT_MEETING_DEVICE,
   };
 }
 
@@ -69,18 +55,17 @@ type Ctx = {
 export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private pulse = new Map<string, 0 | 1>();
-  private audio = new Map<string, AudioOutput | null>(); // last-known live output device
-  private audioPolledAt = new Map<string, number>();
-  private readonly audioControl: AudioControl = getAudioControl();
+  private meetingOn = new Map<string, boolean>(); // app-owned meeting-mode bit
+  private readonly runner: ShortcutRunner = getShortcutRunner();
 
   override onWillAppear(ev: WillAppearEvent<CountdownSettings>): void {
     // Seed the default terminal threshold so the PI field shows 05:00 instead of blank.
-    // sdpi only falls back to the `default` attribute when the setting is undefined; an
-    // empty-string setting renders blank, so persist a real value when it's missing/blank.
     const s = ev.payload.settings ?? {};
     if (!(s.thresholdMmss ?? "").trim()) {
       void ev.action.setSettings({ ...s, thresholdMmss: DEFAULT_THRESHOLD_MMSS });
     }
+    // Restore the persisted meeting-mode bit so the glow survives a plugin reload.
+    this.meetingOn.set(ev.action.id, s.meetingOn ?? false);
     this.scheduleNext(ev as unknown as Ctx, 0);
   }
 
@@ -90,30 +75,40 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     if (t) clearTimeout(t);
     this.timers.delete(id);
     this.pulse.delete(id);
-    this.audio.delete(id);
-    this.audioPolledAt.delete(id);
+    this.meetingOn.delete(id);
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<CountdownSettings>): void {
     this.scheduleNext(ev as unknown as Ctx, 0);
   }
 
-  /** Press toggles the audio output, repaints from the read-back truth, and notifies HA on a confirmed flip. */
+  /** Press runs the configured Shortcut with the target state, flips the bit on success, and notifies HA. */
   override async onKeyDown(ev: KeyDownEvent<CountdownSettings>): Promise<void> {
     const id = ev.action.id;
     const settings = ev.payload.settings ?? {};
-    const { normal, meeting } = devicesFrom(settings);
-    const current = this.audio.get(id) ?? (await this.audioControl.current());
-    const target = nextOutputTarget(current ?? null, normal, meeting);
-    const result = await this.audioControl.setOutput(target); // read-back: never assume the switch took
-    // The key may have disappeared during the switch; don't re-arm a hidden page.
+    const name = (settings.shortcutName ?? "").trim();
+    if (!name) {
+      streamDeck.logger.info("[mc] press ignored: no shortcut configured");
+      return;
+    }
+    const before = this.meetingOn.get(id) ?? settings.meetingOn ?? false;
+    const after = !before;
+    // ponytail: exit 0 gates the flip — no read-back of real system state (the Shortcut
+    // may touch many settings). The bit can drift across a reboot; a press re-syncs.
+    const ok = await this.runner.run(name, targetFor(after));
+    // The key may have disappeared during the run; don't re-arm a hidden page.
     if (!this.timers.has(id)) return;
-    this.audio.set(id, result);
-    this.audioPolledAt.set(id, Date.now());
-    // Notify Home Assistant only when the read-back confirms meeting mode actually flipped.
+    if (!ok) {
+      streamDeck.logger.warn("[mc] shortcut run failed; meeting-mode bit unchanged");
+      this.scheduleNext(ev as unknown as Ctx, 0);
+      return;
+    }
+    this.meetingOn.set(id, after);
+    void ev.action.setSettings({ ...settings, meetingOn: after }); // persist across reloads
+    // Every press is a real flip, so this always fires the correct direction.
     const hook = webhookForTransition(
-      isMeetingMode(current ?? null, meeting),
-      isMeetingMode(result, meeting),
+      before,
+      after,
       settings.meetingModeWebhook ?? "",
       settings.noMeetingWebhook ?? "",
     );
@@ -125,23 +120,11 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
   private notifyHomeAssistant(url: string): void {
     void fetch(url, { method: "POST" })
       .then((res) => {
-        // A wrong/misconfigured webhook id returns 404/405 and still RESOLVES — surface it.
+        // A wrong/misconfigured webhook id returns 200 and still RESOLVES — can't detect it.
         // Log the status only; the URL carries the secret webhook id.
         if (!res.ok) streamDeck.logger.warn(`[mc] HA webhook -> HTTP ${res.status}`);
       })
       .catch(() => streamDeck.logger.warn(`[mc] HA webhook POST failed`));
-  }
-
-  /** Feed the PI's device dropdowns from the live CoreAudio device list. */
-  override async onSendToPlugin(
-    ev: SendToPluginEvent<JsonValue, CountdownSettings>,
-  ): Promise<void> {
-    const payload = ev.payload as { event?: string };
-    if (payload?.event === "getOutputDevices") {
-      const devices = await this.audioControl.list();
-      const items = devices.map((d) => ({ label: d.name, value: d.uid }));
-      await streamDeck.ui.sendToPropertyInspector({ event: "getOutputDevices", items });
-    }
   }
 
   /** Self-rescheduling redraw loop; cadence depends on the current state. */
@@ -156,29 +139,6 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     this.timers.set(id, t);
   }
 
-  /** Throttled, fire-and-forget refresh of the cached live output device. */
-  private refreshAudio(ev: Ctx, id: string): void {
-    const now = Date.now();
-    if (now - (this.audioPolledAt.get(id) ?? 0) < AUDIO_POLL_MS) return;
-    this.audioPolledAt.set(id, now);
-    void this.audioControl
-      .current()
-      .then((out) => {
-        // If the key disappeared while current() was in flight, onWillDisappear has
-        // cleared the timer; do NOT resurrect the redraw loop on a hidden page.
-        if (!this.timers.has(id)) return;
-        const prev = this.audio.get(id);
-        this.audio.set(id, out);
-        // Repaint promptly only when the device actually changed (cheap; avoids
-        // re-toggling pulse on every poll).
-        if ((prev?.uid ?? null) !== (out?.uid ?? null)) this.scheduleNext(ev, 0);
-      })
-      .catch(() => {
-        if (!this.timers.has(id)) return;
-        this.audio.set(id, null);
-      });
-  }
-
   /** Paint one frame; return the delay until the next. */
   private redraw(ev: Ctx): number {
     const id = ev.action.id;
@@ -188,9 +148,7 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     const thresholdMs =
       (parseThresholdSeconds(settings.thresholdMmss ?? "") ?? DEFAULT_THRESHOLD_SECONDS) * 1000;
 
-    this.refreshAudio(ev, id);
-    const { meeting: meetingDevice } = devicesFrom(settings);
-    const meetingOn = isMeetingMode(this.audio.get(id) ?? null, meetingDevice);
+    const meetingOn = this.meetingOn.get(id) ?? false;
 
     if (url === "") {
       void ev.action.setImage(
@@ -209,8 +167,6 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
       return CRUISE_MS;
     }
     if (snap.status === "unavailable" && snap.value === null) {
-      // M3: on first load (fetchedAt === 0) no poll has completed yet — show a
-      // neutral acquiring frame instead of the fault state so there's no flash.
       const big = snap.fetchedAt === 0 ? "SYNC" : "NO LINK";
       void ev.action.setImage(
         toDataUri(renderCountdown({ state: "idle", title: "", big, glow: glowColor("idle", meetingOn) })),
@@ -222,9 +178,7 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     const meeting = selectNextMeeting(snap.value ?? [], filtersFrom(settings), now, thresholdMs);
     const state = pickState(now, meeting, thresholdMs);
 
-    // Forensic breadcrumb (kept intentionally): log whenever the key sits on NOW, so any
-    // future unexpected NOW is traceable to the exact meeting that caused it. Fires at most
-    // once per redraw (~once/min) and only while a meeting is genuinely ongoing.
+    // Forensic breadcrumb (kept intentionally): log whenever the key sits on NOW.
     if (state === "liftoff" && meeting) {
       streamDeck.logger.info(
         `[mc] NOW "${meeting.title}" ${new Date(meeting.start).toISOString()}..${new Date(meeting.end).toISOString()}`,
