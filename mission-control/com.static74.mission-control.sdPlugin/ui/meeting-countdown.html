@@ -175,15 +175,11 @@
     <sdpi-textfield setting="excludeTitlePattern" placeholder="e.g. Focus Time"></sdpi-textfield>
   </sdpi-item>
 
-  <!-- Audio output devices for Meeting Mode. Options are the live CoreAudio devices
-       reported by the bundled helper (datasource "getOutputDevices"); the stored value
-       is the device uid. macOS only — empty on other platforms. -->
-  <sdpi-item label="Normal output device">
-    <sdpi-select setting="normalDevice" datasource="getOutputDevices" placeholder="Your normal output"></sdpi-select>
-  </sdpi-item>
-
-  <sdpi-item label="Meeting output device">
-    <sdpi-select setting="meetingDevice" datasource="getOutputDevices" placeholder="Your meeting output"></sdpi-select>
+  <!-- macOS Shortcut run on key press. The plugin pipes "meeting" when entering meeting
+       mode and "normal" when leaving; the Shortcut branches with: If [Shortcut Input] is
+       "meeting" … Otherwise … . The Shortcut owns the actual audio/system changes. -->
+  <sdpi-item label="Shortcut name">
+    <sdpi-textfield setting="shortcutName" placeholder="Exact Shortcut name"></sdpi-textfield>
   </sdpi-item>
 
   <!-- Home Assistant webhooks (optional). Fired only on a key press that flips meeting
