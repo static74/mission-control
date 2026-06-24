@@ -16,13 +16,16 @@ export interface MeetingFilters {
   excludeTitlePattern: string; // case-insensitive substring; "" = none
 }
 
+/** A meeting holds the key (counting up) for this long after it starts, then releases it. */
+export const LIFTOFF_WINDOW_MS = 5 * 60_000;
+
 /**
- * End of a meeting's "NOW" window: its actual end time. NOW (liftoff) shows only
- * while the meeting is ongoing (start..end), so a finished meeting clears at once and
- * a long meeting keeps showing NOW for its full duration.
+ * End of a meeting's hold window: it holds the key for LIFTOFF_WINDOW_MS after start (the
+ * count-up window), capped at its actual end for a meeting shorter than that. After this
+ * the meeting releases the key so the next meeting (or CLEAR) surfaces.
  */
 export function graceEnd(e: { start: number; end: number }): number {
-  return e.end;
+  return Math.min(e.end, e.start + LIFTOFF_WINDOW_MS);
 }
 
 export function qualifies(e: CalEvent, f: MeetingFilters): boolean {

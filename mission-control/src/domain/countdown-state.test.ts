@@ -27,9 +27,14 @@ test("inside five minutes is terminal", () => {
 test("just started is liftoff", () => {
   expect(pickState(NOW, { start: NOW - 1000, end: NOW + 30 * MIN }, threshold)).toBe("liftoff");
 });
-test("an ongoing meeting (started, not yet ended) is liftoff", () => {
-  // NOW shows for the whole meeting now — until it actually ends, no 15-min cap.
-  expect(pickState(NOW, { start: NOW - 20 * MIN, end: NOW + 10 * MIN }, threshold)).toBe("liftoff");
+test("within 5 minutes after start is liftoff (count-up window)", () => {
+  expect(pickState(NOW, { start: NOW - 2 * MIN, end: NOW + 30 * MIN }, threshold)).toBe("liftoff");
+});
+test("at exactly 5 minutes after start is still liftoff (inclusive edge)", () => {
+  expect(pickState(NOW, { start: NOW - 5 * MIN, end: NOW + 30 * MIN }, threshold)).toBe("liftoff");
+});
+test("more than 5 minutes after start is idle — the meeting has released the key", () => {
+  expect(pickState(NOW, { start: NOW - 6 * MIN, end: NOW + 30 * MIN }, threshold)).toBe("idle");
 });
 test("past the meeting's end is idle", () => {
   expect(pickState(NOW, { start: NOW - 40 * MIN, end: NOW - 10 * MIN }, threshold)).toBe("idle");

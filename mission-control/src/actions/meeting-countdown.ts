@@ -202,6 +202,7 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
       glow: glowColor(state, meetingOn),
     };
     void ev.action.setImage(toDataUri(renderCountdown(view)));
-    return state === "terminal" ? TERMINAL_MS : CRUISE_MS;
+    // terminal counts down and liftoff counts up — both need a 1s tick.
+    return state === "terminal" || state === "liftoff" ? TERMINAL_MS : CRUISE_MS;
   }
 }

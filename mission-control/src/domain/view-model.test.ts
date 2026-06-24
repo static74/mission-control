@@ -13,8 +13,11 @@ test("cruise readout is T- Mm for sub-hour", () => {
 test("terminal readout is MM:SS", () => {
   expect(buildBig("terminal", NOW, { start: NOW + 4 * MIN + 9_000, end: NOW + 30 * MIN })).toBe("04:09");
 });
-test("liftoff readout is NOW", () => {
-  expect(buildBig("liftoff", NOW, { start: NOW - 1000, end: NOW + MIN })).toBe("NOW");
+test("liftoff readout counts up +MM:SS from the meeting start", () => {
+  expect(buildBig("liftoff", NOW, { start: NOW - (2 * MIN + 30_000), end: NOW + 30 * MIN })).toBe("+02:30");
+});
+test("liftoff readout is +00:00 at the moment of start", () => {
+  expect(buildBig("liftoff", NOW, { start: NOW, end: NOW + 30 * MIN })).toBe("+00:00");
 });
 test("idle readout is CLEAR", () => {
   expect(buildBig("idle", NOW, null)).toBe("CLEAR");
