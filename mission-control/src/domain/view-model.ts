@@ -13,7 +13,11 @@ export function buildBig(
   meeting: { start: number; end: number } | null,
 ): string {
   if (state === "idle" || !meeting) return "CLEAR";
-  if (state === "liftoff") return "NOW";
+  if (state === "liftoff") {
+    // Count up from the meeting start for the duration of the liftoff window.
+    const elapsedSec = Math.max(0, Math.floor((now - meeting.start) / 1000));
+    return `+${pad(Math.floor(elapsedSec / 60))}:${pad(elapsedSec % 60)}`;
+  }
   const remaining = Math.max(0, meeting.start - now);
   if (state === "terminal") {
     const totalSec = Math.ceil(remaining / 1000);

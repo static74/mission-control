@@ -4,7 +4,7 @@ import type { CountdownState } from "../domain/countdown-state";
 export interface CountdownView {
   state: CountdownState;
   title: string;             // meeting title; "" when none
-  big: string;               // main readout: "T- 1:24" | "04:59" | "NOW" | "CLEAR" | "SET URL"
+  big: string;               // main readout: "T- 1:24" | "04:59" | "+02:30" | "CLEAR" | "SET URL"
   pulsePhase?: 0 | 1;        // terminal alternation; toggled by the action each redraw
   ringFraction?: number;     // 0..1 cruise orbit-ring depletion (1 = far away)
   glow?: string | null;      // meeting-mode edge glow color; null/undefined = no glow
