@@ -16,7 +16,8 @@ export const SHORTCUT_TIMEOUT_MS = 120_000;
 /**
  * Run `shortcuts run <name>`, writing `input` to stdin. Apple's CLI delivers piped
  * stdin as the shortcut's TEXT input (--input-path is for files), so the shortcut
- * receives "meeting"/"normal" as its Shortcut Input. Rejects on non-zero exit or error.
+ * receives one of `meeting`, `normal`, `reset meeting`, `reset normal` as its Shortcut
+ * Input. Rejects on non-zero exit or error.
  */
 function defaultExec(name: string, input: string): Promise<void> {
   return new Promise((resolve, reject) => {

@@ -6,6 +6,7 @@ import {
   type WillDisappearEvent,
   type DidReceiveSettingsEvent,
   type KeyDownEvent,
+  type KeyUpEvent,
 } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
@@ -16,7 +17,7 @@ import { parseThresholdSeconds, DEFAULT_THRESHOLD_SECONDS, DEFAULT_THRESHOLD_MMS
 import { buildBig, ringFraction } from "../domain/view-model";
 import { renderCountdown, toDataUri, type CountdownView } from "../theme/render-countdown";
 import { glowColor } from "../theme/glow";
-import { targetFor, webhookForTransition } from "../domain/meeting-mode";
+import { inputFor, isLongPress, webhookForTransition } from "../domain/meeting-mode";
 import { getShortcutRunner } from "../shortcut/shortcut-runner-registry";
 import type { ShortcutRunner } from "../shortcut/shortcut-runner";
 
@@ -28,7 +29,7 @@ interface CountdownSettings {
   hasLinkOnly?: boolean;
   hideAllDay?: boolean;
   excludeTitlePattern?: string;
-  shortcutName?: string; // macOS Shortcut run on press; receives "meeting"/"normal" as input
+  shortcutName?: string; // macOS Shortcut run on key-up; stdin is "meeting"/"normal"/"reset meeting"/"reset normal"
   meetingOn?: boolean; // app-owned meeting-mode bit, persisted across reloads
   meetingModeWebhook?: string; // HA webhook POSTed when a press enters meeting mode
   noMeetingWebhook?: string; // HA webhook POSTed when a press leaves meeting mode
@@ -56,6 +57,8 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private pulse = new Map<string, 0 | 1>();
   private meetingOn = new Map<string, boolean>(); // app-owned meeting-mode bit
+  private pressedAt = new Map<string, number>(); // key-down time; key-up decides short vs long
+  private inFlight = new Set<string>(); // a Shortcut run is open (its menu may be on screen)
   private readonly runner: ShortcutRunner = getShortcutRunner();
 
   override onWillAppear(ev: WillAppearEvent<CountdownSettings>): void {
@@ -76,26 +79,51 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
     this.timers.delete(id);
     this.pulse.delete(id);
     this.meetingOn.delete(id);
+    this.pressedAt.delete(id);
+    // inFlight is left alone: the run's own `finally` clears it when the Shortcut exits.
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<CountdownSettings>): void {
     this.scheduleNext(ev as unknown as Ctx, 0);
   }
 
-  /** Press runs the configured Shortcut with the target state, flips the bit on success, and notifies HA. */
-  override async onKeyDown(ev: KeyDownEvent<CountdownSettings>): Promise<void> {
+  /** Record the press time; the decision waits for key-up so a long press can be told apart. */
+  override onKeyDown(ev: KeyDownEvent<CountdownSettings>): void {
+    this.pressedAt.set(ev.action.id, Date.now());
+  }
+
+  /**
+   * Short press: run the Shortcut toward the other mode, flip the bit on exit 0, notify HA.
+   * Long press: ask the Shortcut to forget both Quick Config picks and re-pick the current
+   * mode. A long press never flips the bit and never fires a webhook.
+   */
+  override async onKeyUp(ev: KeyUpEvent<CountdownSettings>): Promise<void> {
     const id = ev.action.id;
+    const downAt = this.pressedAt.get(id);
+    this.pressedAt.delete(id);
+    // ponytail: a key-up with no recorded key-down (plugin reloaded mid-press) is ignored.
+    if (downAt === undefined) return;
+    if (this.inFlight.has(id)) {
+      streamDeck.logger.info("[mc] press ignored: a Shortcut run is already open");
+      return;
+    }
     const settings = ev.payload.settings ?? {};
     const name = (settings.shortcutName ?? "").trim();
     if (!name) {
       streamDeck.logger.info("[mc] press ignored: no shortcut configured");
       return;
     }
+    const long = isLongPress(Date.now() - downAt);
     const before = this.meetingOn.get(id) ?? settings.meetingOn ?? false;
-    const after = !before;
     // ponytail: exit 0 gates the flip — no read-back of real system state (the Shortcut
     // may touch many settings). The bit can drift across a reboot; a press re-syncs.
-    const ok = await this.runner.run(name, targetFor(after));
+    this.inFlight.add(id);
+    let ok: boolean;
+    try {
+      ok = await this.runner.run(name, inputFor(long, before));
+    } finally {
+      this.inFlight.delete(id);
+    }
     // The key may have disappeared during the run; don't re-arm a hidden page.
     if (!this.timers.has(id)) return;
     if (!ok) {
@@ -103,9 +131,15 @@ export class MeetingCountdownAction extends SingletonAction<CountdownSettings> {
       this.scheduleNext(ev as unknown as Ctx, 0);
       return;
     }
+    if (long) {
+      streamDeck.logger.info("[mc] Quick Config re-picked; meeting-mode bit unchanged");
+      this.scheduleNext(ev as unknown as Ctx, 0);
+      return;
+    }
+    const after = !before;
     this.meetingOn.set(id, after);
     void ev.action.setSettings({ ...settings, meetingOn: after }); // persist across reloads
-    // Every press is a real flip, so this always fires the correct direction.
+    // Every short press that succeeds is a real flip, so this fires the correct direction.
     const hook = webhookForTransition(
       before,
       after,
