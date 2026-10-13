@@ -175,9 +175,10 @@
     <sdpi-textfield setting="excludeTitlePattern" placeholder="e.g. Focus Time"></sdpi-textfield>
   </sdpi-item>
 
-  <!-- macOS Shortcut run on key press. The plugin pipes "meeting" when entering meeting
-       mode and "normal" when leaving; the Shortcut branches with: If [Shortcut Input] is
-       "meeting" … Otherwise … . The Shortcut owns the actual audio/system changes. -->
+  <!-- macOS Shortcut run on key release. A short press pipes "meeting" when entering meeting
+       mode and "normal" when leaving; a press of 600 ms or longer pipes "reset <current
+       mode>" to re-pick the Quick Config. The Shortcut (Meeting Mode v2) owns the actual
+       audio/system changes. -->
   <sdpi-item label="Shortcut name">
     <sdpi-textfield setting="shortcutName" placeholder="Exact Shortcut name"></sdpi-textfield>
   </sdpi-item>

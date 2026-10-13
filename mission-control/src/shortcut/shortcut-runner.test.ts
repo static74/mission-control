@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { CliShortcutRunner } from "./shortcut-runner";
+import { CliShortcutRunner, SHORTCUT_TIMEOUT_MS } from "./shortcut-runner";
 
 test("run() returns true and passes name+input when the shortcut exits 0", async () => {
   const exec = vi.fn().mockResolvedValue(undefined);
@@ -19,4 +19,8 @@ test("run() is a no-op returning false on non-darwin", async () => {
   const r = new CliShortcutRunner({ exec, platform: "win32" });
   expect(await r.run("Meeting Mode", "meeting")).toBe(false);
   expect(exec).not.toHaveBeenCalled();
+});
+
+test("the runner waits up to 120 s so the user can answer the Quick Config menu", () => {
+  expect(SHORTCUT_TIMEOUT_MS).toBe(120_000);
 });
