@@ -9,23 +9,32 @@ import copy, os, plistlib, shutil, sqlite3, subprocess, sys, tempfile, urllib.pa
 DIR = '"$HOME/Library/Application Support/Mission Control"'
 SENTINEL = "__MC_PICK__"  # ponytail: a Quick Config literally named this would be treated as "nothing saved"
 
+# Fills `names` with SoundSource's Quick Config names (empty if the plist is missing or unreadable).
+NAMES = '''f="$HOME/Library/Application Support/SoundSource/Presets.v2.plist"
+names=()
+g=0; while u=$(plutil -extract $g.uuid raw "$f" 2>/dev/null); do
+  if [ "$u" = Configs ]; then i=0; while n=$(plutil -extract $g.presets.$i.name raw "$f" 2>/dev/null); do names+=("$n"); i=$((i+1)); done; fi
+  g=$((g+1)); done'''
+
 # stdin: exactly one of meeting | normal | reset meeting | reset normal (no trailing newline;
 # anything else, a trailing newline included, exits 2 before touching any file).
-# Prints the saved Quick Config name for the mode, or the sentinel when none is saved.
+# Prints the saved Quick Config name for the mode, or the sentinel when none is saved or the
+# saved name is no longer in SoundSource's list (a stale name would make SoundSource show its own
+# picker; the stale file stays until SAVE overwrites it). `(Ie)` is an exact, literal element test.
 RESOLVE = f'''d={DIR}
 in=$(cat; printf x); in=${{in%x}}
 mode=${{in#reset }}
 case $mode in meeting|normal) ;; *) print -u2 "Mission Control: unexpected input [$in]"; exit 2;; esac
 [ "$in" != "$mode" ] && rm -f "$d/meeting-config" "$d/normal-config"
 saved=$(cat "$d/$mode-config" 2>/dev/null)
+if [ -n "$saved" ]; then
+{NAMES}
+  (( ${{names[(Ie)$saved]}} )) || saved=
+fi
 if [ -n "$saved" ]; then printf '%s' "$saved"; else printf '%s' {SENTINEL}; fi'''
 
 # Prints SoundSource's Quick Config names, newline-separated, no trailing newline.
-LIST = '''f="$HOME/Library/Application Support/SoundSource/Presets.v2.plist"
-names=()
-g=0; while u=$(plutil -extract $g.uuid raw "$f" 2>/dev/null); do
-  if [ "$u" = Configs ]; then i=0; while n=$(plutil -extract $g.presets.$i.name raw "$f" 2>/dev/null); do names+=("$n"); i=$((i+1)); done; fi
-  g=$((g+1)); done
+LIST = NAMES + '''
 printf '%s' "${(F)names}"'''
 
 # stdin: line 1 = the Shortcut input, rest = the picked name. The name arrives on stdin,
@@ -60,6 +69,15 @@ def _selftest_shell(home):
     d = os.path.join(home, "Library/Application Support/Mission Control")
     cfg = lambda m: os.path.join(d, f"{m}-config")
     name = 'Bob\'s "HiFi" Mix'
+    # Fixture: the Configs group holds every name saved below that must read back; "Other" must be ignored.
+    configs = [name, "HiFi Club", "Headphones", "Bob's Mix", "AB", "[Live]"]
+    ss = os.path.join(home, "Library/Application Support/SoundSource")
+    plist = os.path.join(ss, "Presets.v2.plist")
+    os.makedirs(ss)
+    with open(plist, "wb") as f:
+        plistlib.dump([{"uuid": "Other", "presets": [{"name": "X"}]},
+                       {"uuid": "Configs", "presets": [{"name": n} for n in configs]}], f)
+    assert sh(LIST, "", home) == (0, "\n".join(configs)), "LIST reads only the Configs group"
     assert sh(RESOLVE, "meeting", home) == (0, SENTINEL), "nothing saved -> sentinel"
     assert sh(SAVE, "meeting\n" + name, home) == (0, name), "save echoes the pick"
     assert open(cfg("meeting")).read() == name, "file is byte-exact"
@@ -79,12 +97,19 @@ def _selftest_shell(home):
     assert sorted(os.listdir(d)) == ["meeting-config", "normal-config"], "bad input wrote nothing"
     assert open(cfg("meeting")).read() == "Headphones" and open(cfg("normal")).read() == "HiFi Club", \
         "bad input kept both picks"
-    ss = os.path.join(home, "Library/Application Support/SoundSource")
-    os.makedirs(ss)
-    with open(os.path.join(ss, "Presets.v2.plist"), "wb") as f:
-        plistlib.dump([{"uuid": "Other", "presets": [{"name": "X"}]},
-                       {"uuid": "Configs", "presets": [{"name": "A"}, {"name": "Bob's Mix"}]}], f)
-    assert sh(LIST, "", home) == (0, "A\nBob's Mix"), "LIST reads only the Configs group"
+    # A saved name missing from SoundSource's live list is stale: sentinel, file left untouched.
+    # Match is exact and literal: no prefix, glob, or other-group matches.
+    for stale in ["No Such Config", "Bob", "A*", "A?", "*", "[AB]", "X", "bob's mix", "Bob's Mix "]:
+        assert sh(SAVE, "normal\n" + stale, home) == (0, stale)
+        assert sh(RESOLVE, "normal", home) == (0, SENTINEL), f"stale {stale!r} -> sentinel"
+        assert open(cfg("normal")).read() == stale, f"stale {stale!r} left in place for SAVE to overwrite"
+    for live in ["[Live]", "Bob's Mix", "AB"]:
+        assert sh(SAVE, "normal\n" + live, home) == (0, live)
+        assert sh(RESOLVE, "normal", home) == (0, live), f"live {live!r} printed exactly"
+    # No plist: the list is empty, so any saved name is stale.
+    os.remove(plist)
+    assert sh(RESOLVE, "normal", home) == (0, SENTINEL), "no plist -> sentinel"
+    assert sh(RESOLVE, "meeting", home) == (0, SENTINEL), "no plist -> sentinel (other mode)"
 
 
 def _selftest_compare():
