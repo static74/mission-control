@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Generate, sign, and verify the `Meeting Mode v2` Shortcut (Mission Control plugin).
 
-Spec: docs/superpowers/specs/2026-10-12-quick-config-picker-design.md
 Run with `python3 -I`. Python 3 stdlib only.
 """
 import copy, os, plistlib, shutil, sqlite3, subprocess, sys, tempfile, urllib.parse, uuid
