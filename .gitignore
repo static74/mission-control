@@ -13,3 +13,11 @@ dist/
 spike/calendar-spike
 spike/slack-spike
 spike/spawn-check
+
+# Private: agent instructions, design/plan docs, local agent config
+CLAUDE.md
+docs/superpowers/
+.claude/
+
+# Stray browser-download duplicates
+* (1).*
